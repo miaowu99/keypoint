@@ -19,14 +19,21 @@ class DataGenerator():
 		self.valid_set       :  选出的验证集
 	
 	functions:
-		__init__(dress_type, joints_list, img_dir, train_data_file)
-			:  初始化
-		test(toWait=0.2)              
-			:  用来测试函数，可以在原图上画出对应map
+		_aux_generator(batch_size=16, stacks=4, normalize=True, sample_set='train')
+			:  你的模型中需要调用这个函数产生一个batch的训练数据、heatmap图和对应权重
+		
+		在主程序中（或者模型的初始化中）调用：
 		_read_train_data()   
 			:  读取csv数据，对应存到train_table和data_dict中
 		_create_set(validation_rate=0.1)        
 			:  选出train_set和valid_set
+		
+		其他的功能性函数：
+		__init__(dress_type, joints_list, img_dir, train_data_file)
+			:  初始化
+		test(toWait=0.2)              
+			:  用来测试函数，可以在原图上画出对应map
+		
 		_give_batch_name(batch_size=16, set='train')
 			:  选出一个batch的数据
 		_generate_hm(height, width, joints, maxlength, weight)
@@ -42,8 +49,6 @@ class DataGenerator():
 			:  同时裁剪图片和对应map
 		_augment(img, hm, max_rotation=30)
 			:  图像旋转增强方法
-		_aux_generator(batch_size=16, stacks=4, normalize=True, sample_set='train')
-			:  调用之前的函数生成数据，不过实际程序没有用它
 		  
 		
 		

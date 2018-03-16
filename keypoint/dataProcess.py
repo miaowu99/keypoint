@@ -41,36 +41,36 @@ class DataGenerator():
         """
         self.train_table = []     # The names of images being trained
         self.data_dict = {}       # The labels of images
-        label_file = pd.read_csv( self.train_data_file)
+        label_file = pd.read_csv(self.train_data_file)
         print('READING LABELS OF TRAIN DATA')
-        label_file = label_file[label_file.image_category == self.dress_type]  # Only take the type we want
         for i in range(label_file.shape[0]):
-            joints = []
-            name = str(label_file.at[i, 'image_id'])
-            weight = []
-            box = []
-            for joint_name in self.joints_list:
-                joint_value = []
-                value = str(label_file.at[i, joint_name])
-                value = value.split('_')
-                # print(value)
-                joint_value.append(int(value[0]))
-                joint_value.append(int(value[1]))
-                joints.append(joint_value)
-                if value[2] != '1':
-                    weight.append(0)
-                else:
-                    weight.append(1)
-            # box of body,[x_box_min,y_box_min,x_box_max,y_box_max]
-            box.append(self._min_point(joints, 0))
-            box.append(self._min_point(joints, 1))
-            box.append(max([x[0] for x in joints]))
-            box.append(max([x[1] for x in joints]))
-            # print(box)
-            # print(name)
-            joints = np.reshape(joints, (-1, 2))
-            self.data_dict[name] = {'box': box, 'joints': joints, 'weights': weight}
-            self.train_table.append(name)
+            if label_file.at[i, 'image_category'] == self.dress_type:  # Only take the type we want
+                joints = []
+                name = str(label_file.at[i, 'image_id'])
+                weight = []
+                box = []
+                for joint_name in self.joints_list:
+                    joint_value = []
+                    value = str(label_file.at[i, joint_name])
+                    value = value.split('_')
+                    # print(value)
+                    joint_value.append(int(value[0]))
+                    joint_value.append(int(value[1]))
+                    joints.append(joint_value)
+                    if value[2] != '1':
+                        weight.append(0)
+                    else:
+                        weight.append(1)
+                # box of body,[x_box_min,y_box_min,x_box_max,y_box_max]
+                box.append(self._min_point(joints, 0))
+                box.append(self._min_point(joints, 1))
+                box.append(max([x[0] for x in joints]))
+                box.append(max([x[1] for x in joints]))
+                # print(box)
+                # print(name)
+                joints = np.reshape(joints, (-1, 2))
+                self.data_dict[name] = {'box': box, 'joints': joints, 'weights': weight}
+                self.train_table.append(name)
         print('FINISH')
         return [self.train_table, self.data_dict]
 
@@ -301,7 +301,7 @@ class DataGenerator():
                     weight = np.asarray(self.data_dict[name]['weights'])
                     train_weights[i] = weight
                     img = self.open_img(name)
-                    padd, cbox = self._crop_data(img.shape[0], img.shape[1], box, joints, boxp=0.2)
+                    padd, cbox = self._crop_data(img.shape[0], img.shape[1], box, boxp=0.2)
                     new_j = self._relative_joints(cbox, padd, joints, to_size=64)
                     hm = self._generate_hm(64, 64, new_j, 64, weight)
                     img = self._crop_img(img, padd, cbox)
