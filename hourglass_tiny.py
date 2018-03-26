@@ -81,6 +81,7 @@ class HourglassModel():
 		self.logdir_test = logdir_test
 		self.joints = joints
 		self.w_loss = w_loss
+		self.restore_dic = 'saver'
 		
 	# ACCESSOR
 	
@@ -93,15 +94,30 @@ class HourglassModel():
 			Be sure to build the model first
 		"""
 		return self.img
-	def get_output(self):
-		""" Returns Output Tensor
+
+	def get_output(self, input_name):
+		""" Returns Output result
 		Output Tensor :
 			Shape: (None, nbStacks, 64, 64, outputDim)
 			Type : tf.float32
 		Warning:
 			Be sure to build the model first
 		"""
-		return self.output
+		input_image, padding, size_rate = self.dataset.open_resize(input_name, color='RGB', output_size=256)
+
+		with tf.device(self.gpu):
+			# output = self.Session.run(tf.nn.sigmoid(self.output), feed_dict={self.img: [input_image/255]})
+			output = self.Session.run(self.output, feed_dict={self.img: [input_image/255]})
+		output = output[0][3]
+		output = np.transpose(output, [2, 0, 1])
+		output, keypoints_64 = self.dataset.normalize_and_find_nkeypoints(output)
+		filtered_output = np.zeros(output.shape, np.uint8)
+		for i in range(filtered_output.shape[0]):
+			filtered_output[i][keypoints_64[i][0]][keypoints_64[i][1]] = 255
+		print('keypoints_64*64', keypoints_64)
+		filtered_output = self.dataset.restore_heatmap(filtered_output, padding=padding, size_rate=size_rate)
+		keypoints = self.dataset.find_nkeypoints(filtered_output)
+		return filtered_output, keypoints
 	def get_label(self):
 		""" Returns Label (Placeholder) Tensor
 		Image Input :
@@ -127,8 +143,7 @@ class HourglassModel():
 			Be sure to build the model first
 		"""
 		return self.saver
-	
-	
+
 	def generate_model(self):
 		""" Create the complete graph
 		"""
@@ -142,14 +157,11 @@ class HourglassModel():
 					self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
 				# Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
 				self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 64, 64, self.outDim))
-				# TODO : Implement weighted loss function
-				# NOT USABLE AT THE MOMENT
-				#weights = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 1, 1, self.outDim))
 			inputTime = time.time()
 			print('---Inputs : Done (' + str(int(abs(inputTime-startTime))) + ' sec.)')
 			if self.attention:
 				self.output = self._graph_mcam(self.img)
-			else :
+			else:
 				self.output = self._graph_hourglass(self.img)
 			graphTime = time.time()
 			print('---Graph : Done (' + str(int(abs(graphTime-inputTime))) + ' sec.)')
@@ -270,7 +282,8 @@ class HourglassModel():
 				#self.weight_summary.flush()
 				print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
 				with tf.name_scope('save'):
-					self.saver.save(self.Session, os.path.join(os.getcwd(), self.saver_dir, str(self.name + '_' + str(epoch + 1))))
+					if epoch % 10 == 9:
+						self.saver.save(self.Session, os.path.join(os.getcwd(), self.saver_dir, str(self.dataset.dress_type + '/' + self.name + '_' + str(epoch + 1))))
 				self.resume['loss'].append(cost)
 				# Validation Set
 				accuracy_array = np.array([0.0]*len(self.joint_accur))
@@ -343,7 +356,7 @@ class HourglassModel():
 		"""
 		self.joint_accur = []
 		for i in range(len(self.joints)):
-			self.joint_accur.append(self._accur(self.output[:, self.nStack - 1, :, :,i], self.gtMaps[:, self.nStack - 1, :, :, i], self.batchSize))
+			self.joint_accur.append(self._accur(self.output[:, self.nStack - 1, :, :, i], self.gtMaps[:, self.nStack - 1, :, :, i], self.batchSize))
 		
 	def _define_saver_summary(self, summary = True):
 		""" Create Summary and Saver
@@ -387,7 +400,7 @@ class HourglassModel():
 		with tf.name_scope('model'):
 			with tf.name_scope('preprocessing'):
 				# Input Dim : nbImages x 256 x 256 x 3
-				pad1 = tf.pad(inputs, [[0,0],[2,2],[2,2],[0,0]], name='pad_1')
+				pad1 = tf.pad(inputs, [[0, 0], [2, 2], [2, 2], [0, 0]], name='pad_1')
 				# Dim pad1 : nbImages x 260 x 260 x 3
 				conv1 = self._conv_bn_relu(pad1, filters= 64, kernel_size = 6, strides = 2, name = 'conv_256_to_128')
 				# Dim conv1 : nbImages x 128 x 128 x 64
@@ -480,9 +493,10 @@ class HourglassModel():
 						else:
 							out[self.nStack - 1] = self._conv(ll[self.nStack - 1], self.outDim, 1,1, 'VALID', 'out')
 				if self.modif:
-					return tf.nn.sigmoid(tf.stack(out, axis= 1 , name= 'stack_output'),name = 'final_output')
+					return tf.stack(out, axis=1, name='final_output')
+					# return tf.nn.sigmoid(tf.stack(out, axis= 1 , name= 'stack_output'),name = 'final_output') 感觉这句有问题
 				else:
-					return tf.stack(out, axis= 1 , name = 'final_output')		
+					return tf.stack(out, axis=1, name='final_output')
 						
 				
 	def _conv(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv'):
@@ -499,14 +513,14 @@ class HourglassModel():
 		"""
 		with tf.name_scope(name):
 			# Kernel for convolution, Xavier Initialisation
-			kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
-			conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding=pad, data_format='NHWC')
+			kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size, kernel_size, inputs.get_shape().as_list()[3], filters]), name='weights')
+			conv = tf.nn.conv2d(inputs, kernel, [1, strides, strides, 1], padding=pad, data_format='NHWC')
 			if self.w_summary:
 				with tf.device('/cpu:0'):
-					tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+					tf.summary.histogram('weights_summary', kernel, collections=['weight'])
 			return conv
 			
-	def _conv_bn_relu(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv_bn_relu'):
+	def _conv_bn_relu(self, inputs, filters, kernel_size=1, strides=1, pad='VALID', name='conv_bn_relu'):
 		""" Spatial Convolution (CONV2D) + BatchNormalization + ReLU Activation
 		Args:
 			inputs			: Input Tensor (Data Type : NHWC)
@@ -519,15 +533,15 @@ class HourglassModel():
 			norm			: Output Tensor
 		"""
 		with tf.name_scope(name):
-			kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
-			conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding='VALID', data_format='NHWC')
-			norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
+			kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size, kernel_size, inputs.get_shape().as_list()[3], filters]), name='weights')
+			conv = tf.nn.conv2d(inputs, kernel, [1, strides, strides, 1], padding=pad, data_format='NHWC')
+			norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn=tf.nn.relu, is_training=self.training)
 			if self.w_summary:
 				with tf.device('/cpu:0'):
-					tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+					tf.summary.histogram('weights_summary', kernel, collections=['weight'])
 			return norm
 	
-	def _conv_block(self, inputs, numOut, name = 'conv_block'):
+	def _conv_block(self, inputs, numOut, name='conv_block'):
 		""" Convolutional Block
 		Args:
 			inputs	: Input Tensor
@@ -538,25 +552,25 @@ class HourglassModel():
 		"""
 		if self.tiny:
 			with tf.name_scope(name):
-				norm = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
-				pad = tf.pad(norm, np.array([[0,0],[1,1],[1,1],[0,0]]), name= 'pad')
-				conv = self._conv(pad, int(numOut), kernel_size=3, strides=1, pad = 'VALID', name= 'conv')
+				norm = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn=tf.nn.relu, is_training=self.training)
+				pad = tf.pad(norm, np.array([[0, 0], [1, 1], [1, 1], [0, 0]]), name='pad')
+				conv = self._conv(pad, int(numOut), kernel_size=3, strides=1, pad='VALID', name='conv')
 				return conv
 		else:
 			with tf.name_scope(name):
 				with tf.name_scope('norm_1'):
-					norm_1 = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
-					conv_1 = self._conv(norm_1, int(numOut/2), kernel_size=1, strides=1, pad = 'VALID', name= 'conv')
+					norm_1 = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn=tf.nn.relu, is_training = self.training)
+					conv_1 = self._conv(norm_1, int(numOut/2), kernel_size=1, strides=1, pad='VALID', name='conv')
 				with tf.name_scope('norm_2'):
-					norm_2 = tf.contrib.layers.batch_norm(conv_1, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
-					pad = tf.pad(norm_2, np.array([[0,0],[1,1],[1,1],[0,0]]), name= 'pad')
-					conv_2 = self._conv(pad, int(numOut/2), kernel_size=3, strides=1, pad = 'VALID', name= 'conv')
+					norm_2 = tf.contrib.layers.batch_norm(conv_1, 0.9, epsilon=1e-5, activation_fn=tf.nn.relu, is_training = self.training)
+					pad = tf.pad(norm_2, np.array([[0, 0], [1, 1], [1, 1], [0, 0]]), name='pad')
+					conv_2 = self._conv(pad, int(numOut/2), kernel_size=3, strides=1, pad='VALID', name='conv')
 				with tf.name_scope('norm_3'):
-					norm_3 = tf.contrib.layers.batch_norm(conv_2, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
-					conv_3 = self._conv(norm_3, int(numOut), kernel_size=1, strides=1, pad = 'VALID', name= 'conv')
+					norm_3 = tf.contrib.layers.batch_norm(conv_2, 0.9, epsilon=1e-5, activation_fn=tf.nn.relu, is_training = self.training)
+					conv_3 = self._conv(norm_3, int(numOut), kernel_size=1, strides=1, pad='VALID', name='conv')
 				return conv_3
 	
-	def _skip_layer(self, inputs, numOut, name = 'skip_layer'):
+	def _skip_layer(self, inputs, numOut, name='skip_layer'):
 		""" Skip Layer
 		Args:
 			inputs	: Input Tensor
@@ -634,8 +648,8 @@ class HourglassModel():
 		Returns:
 			(float) : Distance (in [0,1])
 		"""
-		u_x,u_y = self._argmax(u)
-		v_x,v_y = self._argmax(v)
+		u_x, u_y = self._argmax(u)
+		v_x, v_y = self._argmax(v)
 		return tf.divide(tf.sqrt(tf.square(tf.to_float(u_x - v_x)) + tf.square(tf.to_float(u_y - v_y))), tf.to_float(91))
 	
 	def _accur(self, pred, gtMap, num_image):

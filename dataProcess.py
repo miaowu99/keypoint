@@ -12,13 +12,14 @@ import random
 import time
 from skimage import transform
 import scipy.misc as scm
+import heapq
 
 
 class DataGenerator():
     """
     To process images and labels
     """
-    def __init__(self, dress_type, joints_list, img_dir, train_data_file):
+    def __init__(self, dress_type, joints_list, img_dir, train_data_file='train/Annotations/train.csv', test_data_file='test/test.csv'):
         """Initializer
             Args:
             dress_tpye          : Tpye of dress
@@ -30,17 +31,24 @@ class DataGenerator():
         self.joints_list = joints_list
         self.img_dir = img_dir
         self.train_data_file = train_data_file
+        self.test_data_file = test_data_file
         self.dress_type = dress_type
+        self.test_table = []  # The names of images being tested
+        self.train_table = []  # The names of images being trained
+        self.data_dict = {}  # The labels of images
         self.letter = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N']
 
     # --------------------Generator Initialization Methods ---------------------
+
+    def creator(self):
+        self._read_train_data()
+        self._randomize()
+        self._create_sets()
 
     def _read_train_data(self):
         """
         To read labels in csv
         """
-        self.train_table = []     # The names of images being trained
-        self.data_dict = {}       # The labels of images
         label_file = pd.read_csv(self.train_data_file)
         print('READING LABELS OF TRAIN DATA')
         for i in range(label_file.shape[0]):
@@ -73,6 +81,17 @@ class DataGenerator():
                 self.train_table.append(name)
         print('FINISH')
         return [self.train_table, self.data_dict]
+
+    def read_test_data(self):
+        label_file = pd.read_csv(self.test_data_file)
+        print('READING LABELS OF TEST DATA')
+        for i in range(label_file.shape[0]):
+            if label_file.at[i, 'image_category'] == self.dress_type:  # Only take the type we want
+                name = str(label_file.at[i, 'image_id'])
+                self.test_table.append(name)
+        print('FINISH')
+        return self.test_table
+
 
     """
     Get the least number of a column of the dataFrame 
@@ -311,7 +330,7 @@ class DataGenerator():
                     hm = np.expand_dims(hm, axis=0)
                     hm = np.repeat(hm, stacks, axis=0)
                     if normalize:
-                        train_img[i] = img.astype(np.float32) / 255
+                        train_img[i] = img.astype(np.float32) / 255 - 0.5
                     else:
                         train_img[i] = img.astype(np.float32)
                     train_gtmap[i] = hm
@@ -337,9 +356,8 @@ class DataGenerator():
             name	: Name of the sample
             color	: Color Mode (RGB/BGR/GRAY)
         """
-        if name[-1] in self.letter:
-            name = name[:-1]
         img = cv2.imread(os.path.join(self.img_dir, name))
+        # print(os.path.join(self.img_dir, name))
         if color == 'RGB':
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             return img
@@ -350,6 +368,31 @@ class DataGenerator():
             return img
         else:
             print('Color mode supported: RGB/BGR. If you need another mode do it yourself :p')
+
+    def open_resize(self, name, output_size=256, color='RGB'):
+        """ Open an image and crop it to given size
+               Args:
+                   name	: Name of the sample
+                   color	: Color Mode (RGB/BGR/GRAY)
+               """
+        img = self.open_img(name, color=color)
+        height = img.shape[0]
+        width = img.shape[1]
+        img = img.astype(np.uint8)
+        padding = [[0, 0], [0, 0], [0, 0]]
+        size_rate = width/output_size
+        if width == height:
+            pass
+        elif width > height:
+            pad_size = (width - height)//2
+            padding[0][0] = padding[0][1] = pad_size
+        else:
+            pad_size = (height - width)//2
+            padding[1][0] = padding[1][1] = pad_size
+            size_rate = height/output_size
+        img = np.pad(img, padding, mode='constant')
+        img = scm.imresize(img, (output_size, output_size))
+        return img.astype(np.float32), padding, size_rate
 
     def plot_img(self, name, plot='cv2'):
         """ Plot an image
@@ -364,6 +407,61 @@ class DataGenerator():
             img = self.open_img(name, color='RGB')
             plt.imshow(img)
             plt.show()
+
+    # ---------------------------- Heatmap Processor --------------------------------
+
+    def normalize_and_find_nkeypoints(self, heatmaps):
+        """
+        normalize heatmaps and find the correspond max keypoints
+        :param heatmaps:
+        :param n_max: the number of keypoints you want find from one heatmap
+        :return: normalized heatmaps, keypoints
+        """
+        keypoints = []
+        for i in range(heatmaps.shape[0]):
+            min_point = np.min(heatmaps[i])
+            heatmaps[i] = heatmaps[i] - min_point
+            max_point = np.max(heatmaps[i])
+            print('min_max_point of ', i, 'heatmap:', min_point, '   ', max_point)
+            heatmaps[i] = heatmaps[i] / max_point * 255
+            keypoint = np.argmax(heatmaps[i])
+            keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
+            keypoints.append(keypoint)
+        return heatmaps, np.array(keypoints).astype(np.uint8)
+
+    def find_nkeypoints(self, heatmaps, n_max = 1):
+        """
+        find the correspond n max keypoints, for now n = 1
+        :param heatmaps:
+        :param n_max: the number of keypoints you want find from one heatmap
+        :return: keypoints
+        """
+        keypoints = []
+        for i in range(heatmaps.shape[0]):
+            keypoint = np.argmax(heatmaps[i])
+            keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
+            keypoints.append(keypoint)
+        return np.array(keypoints).astype(np.uint8)
+
+
+    def restore_heatmap(self, heatmaps, padding, size_rate):
+        """
+        restore all heatmaps to image size
+        :param heatmaps: input heatmaps
+        :param padding: padding size
+        :param size_rate: size rate
+        :return:new_heatmap
+        """
+        new_heatmap = []
+        heatmap_size = heatmaps[0].shape[1]
+        re_size = int(heatmap_size*size_rate*4)
+        # print('shape of heatmap is', heatmaps.shape)
+        for i in range(heatmaps.shape[0]):
+            heatmaps[i] = heatmaps[i].astype(np.uint8)
+            heatmap = scm.imresize(heatmaps[i], (re_size, re_size))
+            heatmap = heatmap[padding[0][0]:re_size-padding[0][1], padding[1][0]:re_size-padding[1][1]]
+            new_heatmap.append(heatmap)
+        return np.array(new_heatmap).astype(np.float32)
 
     def test(self, toWait=0.2):
         """ TESTING METHOD
