@@ -41,7 +41,7 @@ if __name__ == '__main__':
 	params = process_config('config.cfg')
 
 	print('--Creating Dataset')
-	dataset = DataGenerator(params['dress_type'], params['joint_list'], params['img_directory'], params['training_data_file'])
+	dataset = DataGenerator(params['dress_type'], params['joint_list'], params['train_img_directory'], params['training_data_file'])
 <<<<<<< HEAD
 	dataset.creator()
 	model = HourglassModel(nFeat=params['nfeats'], nStack=params['nstacks'], nModules=params['nmodules'], nLow=params['nlow'],
