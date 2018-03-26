@@ -49,6 +49,11 @@ class DataGenerator():
         """
         To read labels in csv
         """
+<<<<<<< HEAD
+=======
+        self.train_table = []     # The names of images being trained
+        self.data_dict = {}       # The labels of images
+>>>>>>> f29f128909c9f4544d478f9091c5ef6f1c74b3d1
         label_file = pd.read_csv(self.train_data_file)
         print('READING LABELS OF TRAIN DATA')
         for i in range(label_file.shape[0]):
