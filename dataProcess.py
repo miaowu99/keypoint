@@ -243,6 +243,28 @@ class DataGenerator():
         # padding[0]为高度（y）方向的padding，padding[1]为宽度（x）方向的padding
         return padding, crop_box
 
+    def _crop_data_new(self, height, width):
+        """ Automatically returns a padding vector
+            Args:
+                height		: Original Height
+                width		: Original Width
+                crop_box    : the center point and final point of crop box
+        """
+        padding = [[0, 0], [0, 0], [0, 0]]
+        crop_box = [width//2, width//2, width-2, width-2]
+        if width == height:
+            pass
+        elif width > height:
+            pad_size = (width - height) // 2
+            padding[0][0] = padding[0][1] = pad_size
+        else:
+            pad_size = (height - width) // 2
+            padding[1][0] = padding[1][1] = pad_size
+            crop_box[2] = crop_box[3] = height-2
+            crop_box[1] = crop_box[0] = height//2
+        return padding, crop_box
+
+
     def _crop_img(self, img, padding, crop_box):
         """ Given a bounding box and padding values return cropped image
         Args:
@@ -320,7 +342,7 @@ class DataGenerator():
                     weight = np.asarray(self.data_dict[name]['weights'])
                     train_weights[i] = weight
                     img = self.open_img(name)
-                    padd, cbox = self._crop_data(img.shape[0], img.shape[1], box, boxp=0.2)
+                    padd, cbox = self._crop_data_new(img.shape[0], img.shape[1])
                     new_j = self._relative_joints(cbox, padd, joints, to_size=64)
                     hm = self._generate_hm(64, 64, new_j, 64, weight)
                     img = self._crop_img(img, padd, cbox)
@@ -356,6 +378,7 @@ class DataGenerator():
             name	: Name of the sample
             color	: Color Mode (RGB/BGR/GRAY)
         """
+        print('dir:', os.path.join(self.img_dir, name))
         img = cv2.imread(os.path.join(self.img_dir, name))
         # print(os.path.join(self.img_dir, name))
         if color == 'RGB':
@@ -427,7 +450,7 @@ class DataGenerator():
             keypoint = np.argmax(heatmaps[i])
             keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
             keypoints.append(keypoint)
-        return heatmaps, np.array(keypoints).astype(np.uint8)
+        return heatmaps, np.array(keypoints).astype(np.uint32)
 
     def find_nkeypoints(self, heatmaps, n_max = 1):
         """
@@ -438,10 +461,12 @@ class DataGenerator():
         """
         keypoints = []
         for i in range(heatmaps.shape[0]):
-            keypoint = np.argmax(heatmaps[i])
-            keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
+            maxpoint = np.argmax(heatmaps[i])
+            col = heatmaps.shape[2]
+            keypoint = np.array([maxpoint % col, maxpoint / col])
+            # keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
             keypoints.append(keypoint)
-        return np.array(keypoints).astype(np.uint8)
+        return np.array(keypoints).astype(np.uint32)
 
 
     def restore_heatmap(self, heatmaps, padding, size_rate):
@@ -476,7 +501,7 @@ class DataGenerator():
         for i in range(50):
             img = self.open_img(self.train_set[i])
             w = self.data_dict[self.train_set[i]]['weights']
-            padd, box = self._crop_data(img.shape[0], img.shape[1], self.data_dict[self.train_set[i]]['box'], boxp=0.0)
+            padd, box = self._crop_data_new(img.shape[0], img.shape[1])
             new_j = self._relative_joints(box, padd, self.data_dict[self.train_set[i]]['joints'], to_size=256)
             rhm = self._generate_hm(256, 256, new_j, 256, w)
             rimg = self._crop_img(img, padd, box)

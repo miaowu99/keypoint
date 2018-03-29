@@ -32,6 +32,7 @@ import numpy as np
 import sys
 import datetime
 import os
+import cv2
 
 class HourglassModel():
 	""" HourglassModel class: (to be renamed)
@@ -114,7 +115,7 @@ class HourglassModel():
 		filtered_output = np.zeros(output.shape, np.uint8)
 		for i in range(filtered_output.shape[0]):
 			filtered_output[i][keypoints_64[i][0]][keypoints_64[i][1]] = 255
-		print('keypoints_64*64', keypoints_64)
+		# print('keypoints_64*64', keypoints_64)
 		filtered_output = self.dataset.restore_heatmap(filtered_output, padding=padding, size_rate=size_rate)
 		keypoints = self.dataset.find_nkeypoints(filtered_output)
 		return filtered_output, keypoints
@@ -255,6 +256,7 @@ class HourglassModel():
 					sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) + '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost)[:6] + ' -avg_loss: ' + str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.')
 					sys.stdout.flush()
 					img_train, gt_train, weight_train = next(self.generator)
+					# print('image shape: ', img_train.shape)
 					if i % saveStep == 0:
 						if self.w_loss:
 							_, c, summary = self.Session.run([self.train_rmsprop, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
