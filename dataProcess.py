@@ -331,6 +331,7 @@ class DataGenerator():
             train_gtmap = np.zeros((batch_size, stacks, 64, 64, len(self.joints_list)), np.float32)
             train_weights = np.zeros((batch_size, len(self.joints_list)), np.float32)
             i = 0
+            color_list = ['RGB', 'BGR', 'HSV']
             while i < batch_size:
                 try:
                     if sample_set == 'train':
@@ -338,10 +339,11 @@ class DataGenerator():
                     elif sample_set == 'valid':
                         name = random.choice(self.valid_set)
                     joints = self.data_dict[name]['joints']
-                    box = self.data_dict[name]['box']
+                    # box = self.data_dict[name]['box']
                     weight = np.asarray(self.data_dict[name]['weights'])
                     train_weights[i] = weight
-                    img = self.open_img(name)
+                    color = random.choice(color_list)
+                    img = self.open_img(name, color=color)
                     padd, cbox = self._crop_data_new(img.shape[0], img.shape[1])
                     new_j = self._relative_joints(cbox, padd, joints, to_size=64)
                     hm = self._generate_hm(64, 64, new_j, 64, weight)
@@ -385,6 +387,9 @@ class DataGenerator():
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             return img
         elif color == 'BGR':
+            return img
+        elif color == 'HSV':
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             return img
         elif color == 'GRAY':
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
