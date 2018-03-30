@@ -48,6 +48,6 @@ if __name__ == '__main__':
                            drop_rate= params['dropout_rate'], lear_rate=params['learning_rate'], decay=params['learning_rate_decay'],
                            decay_step=params['decay_step'], dataset=dataset, name=params['name'], logdir_train=params['log_dir_train'],
                            logdir_test=params['log_dir_test'], tiny= params['tiny'], w_loss=params['weighted_loss'],
-                           joints=params['joint_list'], modif=True)
+                           joints=params['joint_list'], modif=False)
 	model.generate_model()
 	model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], saver_dir=params['model_file'], dataset=None)

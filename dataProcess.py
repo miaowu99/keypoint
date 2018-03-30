@@ -352,7 +352,7 @@ class DataGenerator():
                     hm = np.expand_dims(hm, axis=0)
                     hm = np.repeat(hm, stacks, axis=0)
                     if normalize:
-                        train_img[i] = img.astype(np.float32) / 255 - 0.5
+                        train_img[i] = img.astype(np.float32) / 255
                     else:
                         train_img[i] = img.astype(np.float32)
                     train_gtmap[i] = hm
@@ -378,7 +378,7 @@ class DataGenerator():
             name	: Name of the sample
             color	: Color Mode (RGB/BGR/GRAY)
         """
-        print('dir:', os.path.join(self.img_dir, name))
+        # print('dir:', os.path.join(self.img_dir, name))
         img = cv2.imread(os.path.join(self.img_dir, name))
         # print(os.path.join(self.img_dir, name))
         if color == 'RGB':
@@ -445,7 +445,7 @@ class DataGenerator():
             min_point = np.min(heatmaps[i])
             heatmaps[i] = heatmaps[i] - min_point
             max_point = np.max(heatmaps[i])
-            print('min_max_point of ', i, 'heatmap:', min_point, '   ', max_point)
+            # print('min_max_point of ', i, 'heatmap:', min_point, '   ', max_point)
             heatmaps[i] = heatmaps[i] / max_point * 255
             keypoint = np.argmax(heatmaps[i])
             keypoint = divmod(int(keypoint), heatmaps[i].shape[1])

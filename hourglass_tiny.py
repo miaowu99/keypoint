@@ -86,6 +86,9 @@ class HourglassModel():
 		
 	# ACCESSOR
 	
+	def close_sess(self):
+		self.Session.close()
+
 	def get_input(self):
 		""" Returns Input (Placeholder) Tensor
 		Image Input :
@@ -457,7 +460,7 @@ class HourglassModel():
 						else:
 							out[self.nStack - 1] = self._conv(ll[self.nStack - 1], self.outDim, 1,1, 'VALID', 'out')
 				if self.modif:
-					return tf.nn.sigmoid(tf.stack(out, axis= 1 , name= 'stack_output'),name = 'final_output')
+					return tf.stack(out, axis=1, name='final_output')
 				else:
 					return tf.stack(out, axis= 1 , name = 'final_output')	
 			else:
