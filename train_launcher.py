@@ -50,4 +50,4 @@ if __name__ == '__main__':
                            logdir_test=params['log_dir_test'], tiny= params['tiny'], w_loss=params['weighted_loss'],
                            joints=params['joint_list'], modif=False)
 	model.generate_model()
-	model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], saver_dir=params['model_file'], dataset=None)
+	model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], saver_dir=params['model_file'], dataset=None, load=params['model_file'] + params['load_file'])

@@ -56,12 +56,15 @@ if __name__ == '__main__':
 	for i in range(len(test_table)):
 		image = dataset.open_img(test_table[i])
 		output, keypoints = model.get_output(test_table[i])
-		print('image_shape', image.shape)
-		print('keypoints', keypoints)
-		keypoint = dataset.find_nkeypoints(output)
-		for k in range(keypoint.shape[0]):
-			point = tuple(keypoint[k])
-			cv2.circle(image, point, 5, (0, 0, 255), -1)
+		print('image_width', image.shape[1], '   image_height', image.shape[0])
+		print('keypoints:', end='       ')
+		for p in range(keypoints.shape[0]):
+			print(keypoints[p], end='  ')
+		print(' ')
+		for k in range(keypoints.shape[0]):
+			# cv2.imshow(str('point' + str(k)), output[k])
+			point = tuple(keypoints[k])
+			cv2.circle(image, point, 5, (k/keypoints.shape[0]*255, (1 - k/keypoints.shape[0])*255, 255), -1)
 
 		output = output.astype(np.uint8)
 		cv2.imshow('image', image)

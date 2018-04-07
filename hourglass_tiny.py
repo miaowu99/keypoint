@@ -115,11 +115,16 @@ class HourglassModel():
 		output = output[0][3]
 		output = np.transpose(output, [2, 0, 1])
 		output, keypoints_64 = self.dataset.normalize_and_find_nkeypoints(output)
-		filtered_output = np.zeros(output.shape, np.uint8)
-		for i in range(filtered_output.shape[0]):
-			filtered_output[i][keypoints_64[i][0]][keypoints_64[i][1]] = 255
-		# print('keypoints_64*64', keypoints_64)
-		filtered_output = self.dataset.restore_heatmap(filtered_output, padding=padding, size_rate=size_rate)
+		self.dataset.print_key_matrix(output, keypoints_64, matrix_size=5)
+		# filtered_output = np.zeros(output.shape, np.uint8)
+		# for i in range(filtered_output.shape[0]):
+			# cv2.imshow(str('point' + str(i)), output[i])
+			# filtered_output[i][keypoints_64[i][1]][keypoints_64[i][0]] = 255
+		print('keypoints_64*64:', end=' ')
+		for i in range(keypoints_64.shape[0]):
+			print(keypoints_64[i], end='  ')
+		print(' ')
+		filtered_output = self.dataset.restore_heatmap(output, padding=padding, size_rate=size_rate)
 		keypoints = self.dataset.find_nkeypoints(filtered_output)
 		return filtered_output, keypoints
 	def get_label(self):
@@ -288,7 +293,7 @@ class HourglassModel():
 				print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
 				with tf.name_scope('save'):
 					if epoch % 10 == 9:
-						self.saver.save(self.Session, os.path.join(os.getcwd(), self.saver_dir, str(self.dataset.dress_type + '/' + self.name + '_' + str(epoch + 1))))
+						self.saver.save(self.Session, os.path.join(os.getcwd(), self.saver_dir, str(self.name + '_' + str(epoch + 1))))
 				self.resume['loss'].append(cost)
 				# Validation Set
 				accuracy_array = np.array([0.0]*len(self.joint_accur))
@@ -350,14 +355,15 @@ class HourglassModel():
 		""" Create Weighted Loss Function
 		WORK IN PROGRESS
 		"""
-		self.bceloss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps), name= 'cross_entropy_loss')
-		e1 = tf.expand_dims(self.weights,axis = 1, name = 'expdim01')
-		e2 = tf.expand_dims(e1,axis = 1, name = 'expdim02')
-		e3 = tf.expand_dims(e2,axis = 1, name = 'expdim03')
-		return tf.multiply(e3,self.bceloss, name = 'lossW')
+		self.bceloss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels=self.gtMaps), name='cross_entropy_loss')
+		e1 = tf.expand_dims(self.weights, axis=1, name='expdim01')
+		e2 = tf.expand_dims(e1, axis=1, name='expdim02')
+		e3 = tf.expand_dims(e2, axis=1, name='expdim03')
+		return tf.multiply(e3, self.bceloss, name='lossW')
 	
 	def _accuracy_computation(self):
 		""" Computes accuracy tensor
+
 		"""
 		self.joint_accur = []
 		for i in range(len(self.joints)):

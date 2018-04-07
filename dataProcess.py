@@ -65,7 +65,7 @@ class DataGenerator():
                     joint_value.append(int(value[0]))
                     joint_value.append(int(value[1]))
                     joints.append(joint_value)
-                    if value[2] != '1':
+                    if value[2] == '-1':
                         weight.append(0)
                     else:
                         weight.append(1)
@@ -452,8 +452,9 @@ class DataGenerator():
             max_point = np.max(heatmaps[i])
             # print('min_max_point of ', i, 'heatmap:', min_point, '   ', max_point)
             heatmaps[i] = heatmaps[i] / max_point * 255
-            keypoint = np.argmax(heatmaps[i])
-            keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
+            maxpoint = np.argmax(heatmaps[i])
+            col = heatmaps.shape[2]
+            keypoint = np.array([maxpoint % col, maxpoint / col])
             keypoints.append(keypoint)
         return heatmaps, np.array(keypoints).astype(np.uint32)
 
@@ -469,10 +470,37 @@ class DataGenerator():
             maxpoint = np.argmax(heatmaps[i])
             col = heatmaps.shape[2]
             keypoint = np.array([maxpoint % col, maxpoint / col])
-            # keypoint = divmod(int(keypoint), heatmaps[i].shape[1])
+            # keypoint = divmod(int(keypoint), heatmaps[i].shape[1]) #这样做出来x y轴相反
             keypoints.append(keypoint)
         return np.array(keypoints).astype(np.uint32)
 
+    def print_key_matrix(self, heatmaps, keypoints, matrix_size = 5):
+        """
+        :param heatmaps:
+        :param keypoints:
+        :return: print the matrix values around keypoints
+        """
+        width = heatmaps.shape[2]
+        height = heatmaps.shape[1]
+        half_matrix = matrix_size // 2
+        for i in range(heatmaps.shape[0]):
+            keypoint = keypoints[i]
+            heatmap = heatmaps[i]
+            print('matrix: ', i)
+            print(' max ', heatmap[keypoint[1], keypoint[0]])
+            if keypoint[0] - half_matrix < 0:
+                keypoint[0] = half_matrix
+            if keypoint[1] - half_matrix < 0:
+                keypoint[1] = half_matrix
+            if keypoint[0] + half_matrix >= width:
+                keypoint[0] = width - half_matrix - 1
+            if keypoint[1] + half_matrix >= height:
+                keypoint[1] = height - half_matrix - 1
+            left_up = keypoint - half_matrix
+            for k in range(matrix_size):
+                for p in range(matrix_size):
+                    print(heatmap[left_up[1]+k][left_up[0]+p], end=' ')
+                print(' ')
 
     def restore_heatmap(self, heatmaps, padding, size_rate):
         """
@@ -488,7 +516,7 @@ class DataGenerator():
         # print('shape of heatmap is', heatmaps.shape)
         for i in range(heatmaps.shape[0]):
             heatmaps[i] = heatmaps[i].astype(np.uint8)
-            heatmap = scm.imresize(heatmaps[i], (re_size, re_size))
+            heatmap = scm.imresize(heatmaps[i], (re_size, re_size), interp='cubic')
             heatmap = heatmap[padding[0][0]:re_size-padding[0][1], padding[1][0]:re_size-padding[1][1]]
             new_heatmap.append(heatmap)
         return np.array(new_heatmap).astype(np.float32)
