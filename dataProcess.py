@@ -12,7 +12,7 @@ import random
 import time
 from skimage import transform
 import scipy.misc as scm
-import heapq
+from PIL import Image, ImageEnhance, ImageFilter
 
 
 class DataGenerator():
@@ -310,7 +310,9 @@ class DataGenerator():
         new_j = new_j * to_size / (max_l + 0.0000001)
         return new_j.astype(np.int32)
 
-    def _augment(self, img, hm, max_rotation=30):
+    # ---------------------- Augmentation -----------------------------------------
+
+    def _rotate_augment(self, img, hm, max_rotation=30):
         """ # TODO : IMPLEMENT DATA AUGMENTATION
         """
         if random.choice([0, 1]):
@@ -318,6 +320,72 @@ class DataGenerator():
             img = transform.rotate(img, r_angle, preserve_range=True)
             hm = transform.rotate(hm, r_angle)
         return img, hm
+
+    def _random_erase(self, img, list_of_key, weight_of_key, probability=0.5, max_size=0.3):
+        """
+        Randomly erase a rectangle region of a picture and let weight of keypoint in the region be zero
+        :param img:
+        :param list_of_key:
+        :param weight_of_key:
+        :param probability:
+        :param max_size:
+        :return: output image, new_weight_of_key
+        """
+        if np.random.random() > probability:
+            return img, weight_of_key
+        img_width = img.shape[1]
+        img_height = img.shape[0]
+        img_channel = img.shape[2]
+        rec_width = int(img_width*max_size*np.random.random())
+        rec_height = int(img_height*max_size*np.random.random())
+        rectangle = (255 * np.random.random((rec_height, rec_width, img_channel))).astype(np.int8)
+        left_up = [0, 0]
+        left_up[0] = int((img_width-rec_width-1) * np.random.random())
+        left_up[1] = int((img_height-rec_height-1) * np.random.random())
+        for i in range(len(list_of_key)):
+            if left_up[0] < list_of_key[i][0] < left_up[0]+rec_width and left_up[1] < list_of_key[i][1] < left_up[1]+rec_height:
+                weight_of_key[i] = 0
+        img[left_up[1]:left_up[1]+rec_height, left_up[0]:left_up[0]+rec_width] = rectangle
+        print('erase_rectangle:', left_up, '  width:', rec_width, '  height:', rec_height)
+        return img, weight_of_key
+
+    def _color_augment(self, img, max_brightness_rate=2.0, max_color_rate=2.0, max_contrast_rate=2.0,
+                       max_sharpness_rate=3.0):
+        image = Image.fromarray(img)
+        # image.show()
+        # 亮度增强
+        if random.choice([0, 1]):
+            enh_bri = ImageEnhance.Brightness(image)
+            brightness = random.choice([0.5, 0.8, 1.2, 1.5, 1.8])
+            image = enh_bri.enhance(brightness)
+            # image.show()
+
+        # 色度增强
+        if random.choice([0, 1]):
+            enh_col = ImageEnhance.Color(image)
+            color = random.choice([0.5, 0.8, 1.2, 1.5, 1.8])
+            image = enh_col.enhance(color)
+            # image.show()
+
+        # 对比度增强
+        if random.choice([0, 1]):
+            enh_con = ImageEnhance.Contrast(image)
+            contrast = random.choice([0.5, 0.8, 1.2, 1.5, 1.8])
+            image = enh_con.enhance(contrast)
+            # image.show()
+
+        # 锐度增强
+        if random.choice([0, 1]):
+            enh_sha = ImageEnhance.Sharpness(image)
+            sharpness = random.choice([0.5, 0.8, 1.2, 1.5, 1.8])
+            image = enh_sha.enhance(sharpness)
+            # image.show()
+
+        # mo hu
+        if random.choice([0, 0, 1, 0, 0]):
+            image = image.filter(ImageFilter.BLUR)
+        img = np.asarray(image)
+        return img
 
     # ----------------------- Batch Generator ----------------------------------
 
@@ -350,7 +418,11 @@ class DataGenerator():
                     img = self._crop_img(img, padd, cbox)
                     img = img.astype(np.uint8)
                     img = scm.imresize(img, (256, 256))
-                    img, hm = self._augment(img, hm)
+                    # image augmentation
+                    img, weight = self._random_erase(img, new_j, weight, probability=0.8)
+                    img = self._color_augment(img)
+                    img, hm = self._rotate_augment(img, hm)
+
                     hm = np.expand_dims(hm, axis=0)
                     hm = np.repeat(hm, stacks, axis=0)
                     if normalize:
@@ -539,11 +611,14 @@ class DataGenerator():
             rhm = self._generate_hm(256, 256, new_j, 256, w)
             rimg = self._crop_img(img, padd, box)
             rimg = scm.imresize(rimg, (256, 256))
-            grimg = cv2.cvtColor(rimg, cv2.COLOR_RGB2GRAY)
-            cv2.imshow('image', grimg / 255 + np.sum(rhm, axis=2))
+            new_img, new_w = self._random_erase(rimg, new_j, w, probability=1)
+            grimg = cv2.cvtColor(new_img, cv2.COLOR_RGB2GRAY)
+            cv2.imshow('image', grimg / 255 + np.sum(rhm, axis=2, ))
+            print('joint:', new_j)
+            print('weight:', new_w)
             # Wait
             time.sleep(toWait)
-            if cv2.waitKey(1) == 27:
+            if cv2.waitKey(1000000) == 27:
                 print('Ended')
                 cv2.destroyAllWindows()
                 break
