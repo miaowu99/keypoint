@@ -409,7 +409,6 @@ class DataGenerator():
                     joints = self.data_dict[name]['joints']
                     # box = self.data_dict[name]['box']
                     weight = np.asarray(self.data_dict[name]['weights'])
-                    train_weights[i] = weight
                     color = random.choice(color_list)
                     img = self.open_img(name, color=color)
                     padd, cbox = self._crop_data_new(img.shape[0], img.shape[1])
@@ -425,6 +424,7 @@ class DataGenerator():
 
                     hm = np.expand_dims(hm, axis=0)
                     hm = np.repeat(hm, stacks, axis=0)
+                    train_weights[i] = weight
                     if normalize:
                         train_img[i] = img.astype(np.float32) / 255
                     else:
