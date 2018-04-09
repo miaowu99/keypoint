@@ -407,11 +407,14 @@ class DataGenerator():
                     elif sample_set == 'valid':
                         name = random.choice(self.valid_set)
                     joints = self.data_dict[name]['joints']
-                    # box = self.data_dict[name]['box']
+                    box = self.data_dict[name]['box']
                     weight = np.asarray(self.data_dict[name]['weights'])
                     color = random.choice(color_list)
                     img = self.open_img(name, color=color)
-                    padd, cbox = self._crop_data_new(img.shape[0], img.shape[1])
+                    if random.choice([0, 0, 1, 0]):          # 以一定概率按照box裁剪输入图像
+                        padd, cbox = self._crop_data(img.shape[0], img.shape[1], box, boxp=0.2)
+                    else:
+                        padd, cbox = self._crop_data_new(img.shape[0], img.shape[1])
                     new_j = self._relative_joints(cbox, padd, joints, to_size=64)
                     hm = self._generate_hm(64, 64, new_j, 64, weight)
                     img = self._crop_img(img, padd, cbox)
@@ -523,7 +526,7 @@ class DataGenerator():
             heatmaps[i] = heatmaps[i] - min_point
             max_point = np.max(heatmaps[i])
             # print('min_max_point of ', i, 'heatmap:', min_point, '   ', max_point)
-            heatmaps[i] = heatmaps[i] / max_point * 255
+            heatmaps[i] = heatmaps[i] / max_point * 200
             maxpoint = np.argmax(heatmaps[i])
             col = heatmaps.shape[2]
             keypoint = np.array([maxpoint % col, maxpoint / col])

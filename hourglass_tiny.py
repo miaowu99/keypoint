@@ -115,15 +115,17 @@ class HourglassModel():
 		output = output[0][3]
 		output = np.transpose(output, [2, 0, 1])
 		output, keypoints_64 = self.dataset.normalize_and_find_nkeypoints(output)
-		self.dataset.print_key_matrix(output, keypoints_64, matrix_size=5)
+		# self.dataset.print_key_matrix(output, keypoints_64, matrix_size=5)     # 观察关键点周围矩阵数值
 		# filtered_output = np.zeros(output.shape, np.uint8)
 		# for i in range(filtered_output.shape[0]):
 			# cv2.imshow(str('point' + str(i)), output[i])
 			# filtered_output[i][keypoints_64[i][1]][keypoints_64[i][0]] = 255
+		'''
 		print('keypoints_64*64:', end=' ')
 		for i in range(keypoints_64.shape[0]):
 			print(keypoints_64[i], end='  ')
 		print(' ')
+		'''
 		filtered_output = self.dataset.restore_heatmap(output, padding=padding, size_rate=size_rate)
 		keypoints = self.dataset.find_nkeypoints(filtered_output)
 		return filtered_output, keypoints
