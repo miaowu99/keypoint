@@ -350,7 +350,18 @@ class HourglassModel():
 						#	self.saver.restore(self.Session, load)
 					#except Exception:
 						#	print('Loading Failed! (Check README file for further information)')
-				self.saver_dir = saver_dir
+				self.saver_dir = saver_dir				
+			with tf.device(self.cpu):
+				restart_step = tf.assign(self.train_step,0)
+				self.Session.run(restart_step)
+				startTime = time.time()
+				with tf.name_scope('lr'):
+					self.lr = tf.train.exponential_decay(self.learning_rate, self.train_step, self.decay_step, self.decay, staircase= True, name= 'learning_rate')
+				lrTime = time.time()
+				print('---Reset LR : Done (' + str(int(abs(startTime-lrTime))) + ' sec.)')	
+			with tf.device(self.gpu):
+				with tf.name_scope('rmsprop'):
+					self.rmsprop = tf.train.RMSPropOptimizer(learning_rate= self.lr)				
 				self._train(nEpochs, epochSize, saveStep, validIter=10)
 	
 	def weighted_bce_loss(self):
@@ -392,17 +403,23 @@ class HourglassModel():
 		""" Initialize weights
 		"""
 		print('Session initialization')
-		self.Session = tf.Session()
+		config = tf.ConfigProto()  
+		# config.gpu_options.per_process_gpu_memory_fraction = 0.8 #按比例限制显存 
+		config.gpu_options.allow_growth = True      #程序按需申请内存  
+		self.Session = tf.Session(config = config)
 		t_start = time.time()
 		self.Session.run(self.init)
-		print('Sess initialized in ' + str(int(time.time() - t_start)) + ' sec.')
+		print('Weights initialized in ' + str(int(time.time() - t_start)) + ' sec.')
 	
 	def _init_session(self):
 		""" Initialize Session
 		"""
 		print('Session initialization')
 		t_start = time.time()
-		self.Session = tf.Session()
+		config = tf.ConfigProto()  
+		# config.gpu_options.per_process_gpu_memory_fraction = 0.8 #按比例限制显存 		
+		config.gpu_options.allow_growth = True      #程序按需申请内存  
+		self.Session = tf.Session(config = config)
 		print('Sess initialized in ' + str(int(time.time() - t_start)) + ' sec.')
 		
 	def _graph_hourglass(self, inputs):

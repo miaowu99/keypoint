@@ -8,7 +8,7 @@ from hourglass_tiny import HourglassModel
 from dataProcess import DataGenerator
 
 
-def process_config(conf_file):
+def process_config(conf_file, test_type = None):
 	"""
 	"""
 	params = {}
@@ -30,9 +30,14 @@ def process_config(conf_file):
 		if section == 'Saver':
 			for option in config.options(section):
 				params[option] = eval(config.get(section, option))
-		if section == params['dress_type']:
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
+		if test_type == None:
+			if section == params['dress_type']:
+				for option in config.options(section):
+					params[option] = eval(config.get(section, option))	
+		else:
+			if section == test_type:
+				for option in config.options(section):
+					params[option] = eval(config.get(section, option))	
 	return params
 
 
@@ -40,7 +45,7 @@ if __name__ == '__main__':
 	print('--Parsing Config File')
 	params = process_config('config.cfg')
 
-	print('--Creating Dataset')
+	print('--Creating Dataset:',params['dress_type'])
 	dataset = DataGenerator(params['dress_type'], params['joint_list'], params['train_img_directory'], params['training_data_file'])
 	dataset.creator()
 	model = HourglassModel(nFeat=params['nfeats'], nStack=params['nstacks'], nModules=params['nmodules'], nLow=params['nlow'],
