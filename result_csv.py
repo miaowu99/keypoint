@@ -65,7 +65,13 @@ def result_write(result_file, dress_type):
 			name = str(result_file.at[i, 'image_id'])
 			print('Dating ', i, ' PICTURE', '   name is:', name)
 			image = dataset.open_img(name)
-			output, keypoints = model.get_output(name)
+			output, keypoint = model.get_output(name)
+			heatmaps = np.zeros((10, output.shape[0], output.shape[1], output.shape[2]))
+			heatmaps[0] = output
+			for j in range(1, 10):
+				heatmaps[j], keypoint = model.get_output(name)
+			output = dataset.average_heatmaps(heatmaps)
+			keypoints = dataset.find_nkeypoints(output)
 			for k in range(keypoints.shape[0]):
 				position = str(keypoints[k][0]) + '_' + str(keypoints[k][1]) + '_' + '1'
 				result_file.loc[i, joint_list[k]] = position
@@ -83,9 +89,9 @@ def result_write(result_file, dress_type):
 
 
 if __name__ == '__main__':
-	dress_types = ['dress']
-	result_file = pd.read_csv('test/test_result.csv')
+	dress_types = ['blouse']
+	result_file = pd.read_csv('test/test_result_4 12.csv')
 	for dress_type in dress_types:
 		result_write(result_file, dress_type)
-	result_file.to_csv("test/test_result.csv", index=False, na_rep='-1_-1_-1')
+	result_file.to_csv("test/test_result_4 12.csv", index=False, na_rep='-1_-1_-1')
 

@@ -32,7 +32,7 @@ import numpy as np
 import sys
 import datetime
 import os
-import cv2
+import random
 
 class HourglassModel():
 	""" HourglassModel class: (to be renamed)
@@ -107,7 +107,8 @@ class HourglassModel():
 		Warning:
 			Be sure to build the model first
 		"""
-		input_image, padding, size_rate = self.dataset.open_resize(input_name, color='RGB', output_size=256)
+		color = random.choice(['RGB', 'BGR', 'HSV'])
+		input_image, padding, size_rate = self.dataset.open_resize(input_name, color=color, output_size=256)
 
 		with tf.device(self.gpu):
 			# output = self.Session.run(tf.nn.sigmoid(self.output), feed_dict={self.img: [input_image/255]})

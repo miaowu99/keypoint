@@ -479,6 +479,7 @@ class DataGenerator():
                    color	: Color Mode (RGB/BGR/GRAY)
                """
         img = self.open_img(name, color=color)
+        img = self._color_augment(img)
         height = img.shape[0]
         width = img.shape[1]
         img = img.astype(np.uint8)
@@ -595,6 +596,12 @@ class DataGenerator():
             heatmap = heatmap[padding[0][0]:re_size-padding[0][1], padding[1][0]:re_size-padding[1][1]]
             new_heatmap.append(heatmap)
         return np.array(new_heatmap).astype(np.float32)
+
+    def average_heatmaps(self, heatmaps):
+        sum_heatmap = np.zeros(heatmaps[0].shape)
+        for i in range(heatmaps.shape[0]):
+            sum_heatmap += heatmaps[i]
+        return sum_heatmap/heatmaps.shape[0]
 
     def test(self, toWait=0.2):
         """ TESTING METHOD
